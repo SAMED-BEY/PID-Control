@@ -4,10 +4,11 @@ Arayüz ile encoderli motorun PID controlları sağlandı . Arayüzde PID katsay
 C# arayüzü alternatif olarak üretilmiştir.
 
 Pyqt5 arayüzü :
+Grafik sayesinde PID kontrol kulladığımız sistemin dalgalanmalarını gözlemleyebiliyoruz.( Overshoot, deadline, vb. )
 
 ![Pyqt5 panel ](https://user-images.githubusercontent.com/49341225/137780315-1db53d0b-7681-433c-beea-5bc060c990e2.png)
 
-Grafik sayesinde PID kontrol kulladığımız sistemin dalgalanmalarını gözlemleyebiliyoruz.( Overshoot, deadline, vb. )
+
 
 
 
