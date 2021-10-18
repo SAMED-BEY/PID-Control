@@ -1,1 +1,142 @@
 
+/** SAMED ÇALIK 17121201061 */
+
+
+#define encoder_pin 2
+#define motor_cikis 9
+
+#define in1 8 // motorun ileri yonde gitmesi için surucudeki pinler
+#define in2 7
+
+#define max_rpm 3300 // max rpm olan bir motor icin yapılcak map icin onemli
+
+#define bekle 1     //kaç ms ile aralıklarla alıncaksa 
+
+
+
+//--------------------------RPM Value
+//unsigned int target_rpm =1000;
+//unsigned int now_rpm = 0;
+double target_rpm =0;
+int now_rpm = 0;
+
+volatile unsigned long new_time=0;
+volatile unsigned long next_time=0;
+volatile unsigned int diff_time=0;
+
+//------------------------- PID Value
+String KP;  // serialden gelenleri almak için
+String KI;
+String KD;
+String SetRPM;
+
+
+
+
+
+double error =0 ,last_error=0 , error_sum= 0.0;
+double Kp=0.06,Ki=0.055,Kd=0.04;
+double Ep,Ei,Ed;
+double PID_value;
+double PID_output;
+
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(motor_cikis,OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(encoder_pin), RPM, RISING); // motordan her pulse geldiğinde çalıcak
+   
+  delay(1);
+  digitalWrite(in1, HIGH);  // Turn on motor
+  digitalWrite(in2, LOW);
+
+}
+
+void loop() {
+if(Serial.available() > 0)
+{
+  KP = Serial.readStringUntil(','); 
+  Serial.read(); 
+  KI = Serial.readStringUntil(',');
+  Serial.read(); 
+  KD = Serial.readStringUntil(',');
+  Serial.read(); 
+  SetRPM = Serial.readStringUntil('\n'); 
+  
+  Kp = KP.toFloat();      // gelen veriyi Float a cevirir
+  Ki = KI.toFloat();
+  Kd = KD.toFloat(); 
+  target_rpm= SetRPM.toInt();
+
+/*  Ters yonde donmesi için
+  if (target_rpm <0 )
+   {
+     target_rpm = -target_rpm;
+     digitalWrite(in1, LOW);  // Turn on  right motor
+     digitalWrite(in2, HIGH);
+   }
+   else
+   {
+    digitalWrite(in1, HIGH);  // Turn on left motor
+    digitalWrite(in2, LOW);
+    }
+    */
+}
+
+if (diff_time <=0)
+  now_rpm = 0;
+else
+  now_rpm =( (60000000/diff_time) /64 );         // 60000000 mikro-sn(1dk)  / encoderdan gelen 2 veri farki mikro sn / 64 pulse gelidğinden boldum
+                                                //(60000000/diff_time) /64 ); // kullanıgım motorrda 64 yarıklı encodervardı 
+PID_sistem();
+delay(bekle);   // delta t yi sağlamak için
+
+PID_output = Mapping(PID_value);
+analogWrite(motor_cikis,PID_output);
+Serial.println(now_rpm);
+
+}
+
+void PID_sistem()
+{
+  error = target_rpm - now_rpm;
+  error_sum = error + last_error;
+  Ep = Kp*( error );
+  Ei = Ki*( error_sum*bekle);
+  Ed = Kd*( (error - last_error )/bekle);
+ 
+  last_error = error;
+
+  if(error_sum > max_rpm )error_sum = max_rpm;        // sature  // 98 ve 99 kod satırlarını 
+  if(error_sum < -(max_rpm) )error_sum = - (max_rpm);
+  
+  PID_value = Ep+Ei+Ed;
+
+  // clamping 
+
+  if (PID_value > max_rpm )
+  {
+    PID_value = Ep+Ed;
+   }
+
+}
+
+int Mapping(float PID_value)
+{
+
+  if (PID_value <255 & PID_value >0)
+    return PID_value;
+  else if ( PID_value > 255 )
+    return 255;
+  else if ( PID_value<0 )
+    return 0;
+}
+
+void RPM() {
+/*
+*
+*/
+  
+}
