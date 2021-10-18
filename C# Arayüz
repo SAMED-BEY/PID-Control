@@ -1,1 +1,105 @@
 
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.IO.Ports;
+
+namespace arduino_temp3
+{
+    public partial class Form1 : Form
+    {
+        string[] ports = SerialPort.GetPortNames(); // comboBox a portları yaızo
+        public Form1()
+        {
+            InitializeComponent();
+
+        }
+        private string data;
+        private void Form1_Load(object sender, EventArgs e)
+        {
+           // string[] ports = SerialPort.GetPortNames(); // comboBox a portları yaızo
+            foreach (string port in ports)
+            {
+                comboBox1.Items.Add(ports);
+            }
+            //serialPort1.BaudRate = 9600;
+            serialPort1.DataReceived += new SerialDataReceivedEventHandler(SerialPort_DataReceived);
+
+        }
+
+        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)      // arduinodan veri okumak icin
+        {
+            data = serialPort1.ReadLine();              // veriyi satır halinde oku
+            this.Invoke(new EventHandler(displaydata));
+            //System.Threading.Thread.Sleep(10);
+        }
+
+        private void displaydata(object sender, EventArgs e)                                    // arduinodan veri okumak icin
+        {
+            string[] value = data.Split(','); // alt satırla ayrılsın başka işarette konulabilir 
+                                              // genel amac ile yazdıldı
+
+            textBox6.Text = value[0];               // RPM değerini yazıcak
+            aGauge1.Value = Convert.ToInt32(value[0]);  // ilk değer RPM değeri gelcek
+
+            
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                serialPort1.PortName = comboBox1.Text;
+                serialPort1.Open();                     // portu açtı
+
+                button2.Enabled = false;                // buton kullanamazsın tekrar tekrar başlatamazsın
+                button3.Enabled = true;                 // durdurabilirsin
+                label7.Text = "BAĞLANTI AÇIK";
+                label7.ForeColor = Color.Green;
+                
+            }
+            catch (Exception ex)
+            {
+                //label7.Text = "BAĞLANTI KAPALI";
+                MessageBox.Show(ex.Message, "hata");
+
+            }
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                serialPort1.Close();
+                button2.Enabled = true;                // başlatabiirsin
+                button3.Enabled = false;               // tekrar durduramazsın  
+                label7.Text = "BAĞLANTI KAPALI";
+                label7.ForeColor = Color.Red;
+            }
+            catch (Exception ex)
+            {
+
+                MessageBox.Show(ex.Message, "hata");
+            }
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e) // from kapatılırsa
+        {
+            if (serialPort1.IsOpen)
+                serialPort1.Close();
+        }
+
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            serialPort1.Write(textBox5 + "," + textBox4 + "," + textBox3 + "," + textBox2); // RPM Kp Ki Kd değeriini yolluyor
+
+        }
+    }
+}
