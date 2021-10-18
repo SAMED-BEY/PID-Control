@@ -1,0 +1,260 @@
+import sys
+import os
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+import functools
+import numpy as np
+import random as rd
+import matplotlib
+
+matplotlib.use("Qt5Agg")
+from matplotlib.figure import Figure
+from matplotlib.animation import TimedAnimation
+from matplotlib.lines import Line2D
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import time
+import threading
+from PyQt5 import QtWidgets,QtGui,QtCore
+import  serial
+
+arduino = serial.Serial(port='COM6', baudrate=115200, timeout=.1)
+
+
+
+class CustomMainWindow(QMainWindow):
+    def __init__(self):
+        super(CustomMainWindow, self).__init__()
+        # Define the geometry of the main window
+        self.setGeometry(300, 300, 800, 400)
+        self.setWindowTitle("my first window")
+        # Create FRAME_A
+        self.FRAME_A = QFrame(self)
+        self.FRAME_A.setStyleSheet("QWidget { background-color: %s }" % QColor(210, 210, 235, 255).name())
+        self.LAYOUT_A = QGridLayout()
+        self.FRAME_A.setLayout(self.LAYOUT_A)
+        self.setCentralWidget(self.FRAME_A)
+
+
+        self.KP = QLineEdit(self)  ############################# Kp box için
+       # self.KP.move(20, 20)
+        self.KP.resize(50, 50)
+        self.LAYOUT_A.addWidget(self.KP, *  (1, 1))        #
+
+        self.labelKp = QLabel('Kp', self)
+        self.LAYOUT_A.addWidget(self.labelKp, * (1, 0))    #
+
+        self.KI = QLineEdit(self)  ########################3### Ki box için
+      #  self.KI.move(50, 20)
+        self.KI.resize(50, 50)
+        self.LAYOUT_A.addWidget(self.KI, *   (2, 1))
+
+        self.labelKi = QLabel('Ki', self)
+        self.LAYOUT_A.addWidget(self.labelKi, * (2, 0))
+
+        self.KD = QLineEdit(self)  ########################### Kd box için
+        #self.KD.move(20, 20)
+        self.KD.resize(50, 50)
+        self.LAYOUT_A.addWidget(self.KD, *  (3, 1))        #
+
+        self.labelKd = QLabel('Kd', self)
+        self.LAYOUT_A.addWidget(self.labelKd, *  (3, 0))   #
+
+        self.RPM = QLineEdit(self)  ########################## set RPM box için
+        #self.KD.move(20, 20)
+        self.RPM.resize(50, 50)
+        self.LAYOUT_A.addWidget(self.RPM, *   (4, 1))      #
+
+        self.labelRpm = QLabel('set RPM', self)
+        self.LAYOUT_A.addWidget(self.labelRpm, *  (4, 0))      #
+
+
+
+        self.Set = QPushButton(text='Set')####################setting but
+        self.Set.setFixedSize(100, 50)
+        self.Set.clicked.connect(self.SetBtnAction)
+        self.LAYOUT_A.addWidget(self.Set, *(0, 0))
+
+
+
+        # Place the matplotlib figure
+        self.myFig = CustomFigCanvas()
+        self.LAYOUT_A.addWidget(self.myFig, *(0, 2))
+        # Add the callbackfunc to ..
+        myDataLoop = threading.Thread(name='myDataLoop', target=dataSendLoop, daemon=True,
+                                      args=(self.addData_callbackFunc,))
+        myDataLoop.start()
+        self.show()
+        return
+
+
+
+    def SetBtnAction(self):     # burdan arduinoya
+        Kp =  self.KP.text()
+        Ki =  self.KI.text()
+        Kd =  self.KD.text()
+        Rpm = self.RPM.text()
+
+                             ########### değerler girilmediyse bile bu değerleri alsınlar
+        if Kp =="":
+            Kp = "2.0"
+        if Ki == "":
+            Ki = "0.055"
+        if Kd =="":
+            Kd = "0.04"
+        if Rpm =="":
+            Rpm = "2000"
+        #print(type(Rpm))
+        sendToArduino(Kp,Ki,Kd,Rpm)
+        return
+
+    def addData_callbackFunc(self, value):
+        # print("Add data: " + str(value))
+        self.myFig.addData(value)
+        return
+
+
+''' End Class '''
+
+
+class CustomFigCanvas(FigureCanvas, TimedAnimation):
+    def __init__(self):
+        self.addedData = []
+        print(matplotlib.__version__)
+        # The data
+        self.xlim = 200
+        self.n = np.linspace(0, self.xlim - 1, self.xlim)
+        a = []
+        b = []
+        a.append(2.0)
+        a.append(4.0)
+        a.append(2.0)
+        b.append(4.0)
+        b.append(3.0)
+        b.append(4.0)
+        self.y = (self.n * 0.0) + 50
+        # The window
+        self.fig = Figure(figsize=(5, 5), dpi=100)
+        self.ax1 = self.fig.add_subplot(111)
+        # self.ax1 settings
+        self.ax1.set_xlabel('time')
+        self.ax1.set_ylabel('raw data')
+        self.line1 = Line2D([], [], color='blue')
+        self.line1_tail = Line2D([], [], color='red')#, linewidth=2)
+        self.line1_head = Line2D([], [], color='red', marker='o', markeredgecolor='r')
+        self.ax1.add_line(self.line1)
+        self.ax1.add_line(self.line1_tail)
+        self.ax1.add_line(self.line1_head)
+        self.ax1.set_xlim(0, self.xlim - 1)
+        self.ax1.set_ylim(0, 5000)                  ############################ Y eksneini belirliyo
+        FigureCanvas.__init__(self, self.fig)
+        TimedAnimation.__init__(self, self.fig, interval=50, blit=True)
+        return
+
+    def new_frame_seq(self):
+        return iter(range(self.n.size))
+
+    def _init_draw(self):
+        lines = [self.line1, self.line1_tail, self.line1_head]
+        for l in lines:
+            l.set_data([], [])
+        return
+
+    def addData(self, value):
+        self.addedData.append(value)
+        return
+
+
+    def _step(self, *args):
+        # Extends the _step() method for the TimedAnimation class.
+        try:
+            TimedAnimation._step(self, *args)
+        except Exception as e:
+            self.abc += 1
+            print(str(self.abc))
+            TimedAnimation._stop(self)
+            pass
+        return
+
+    def _draw_frame(self, framedata):
+        margin = 2
+        while (len(self.addedData) > 0):
+            self.y = np.roll(self.y, -1)
+            self.y[-1] = self.addedData[0]
+            del (self.addedData[0])
+
+        self.line1.set_data(self.n[0: self.n.size - margin], self.y[0: self.n.size - margin])
+        self.line1_tail.set_data(np.append(self.n[-10:-1 - margin], self.n[-1 - margin]),
+                                 np.append(self.y[-10:-1 - margin], self.y[-1 - margin]))
+        self.line1_head.set_data(self.n[-1 - margin], self.y[-1 - margin])
+        self._drawn_artists = [self.line1, self.line1_tail, self.line1_head]
+        return
+
+
+''' End Class '''
+
+
+# You need to setup a signal slot mechanism, to
+# send data to your GUI in a thread-safe way.
+# Believe me, if you don't do this right, things
+# go very very wrong..
+class Communicate(QObject):
+    data_signal = pyqtSignal(float)
+
+
+''' End Class '''
+
+
+
+
+
+def arduino_read():
+    data = arduino.readline()       # arduinodan line olarak veri çekiyo
+
+    data = byte_to_int(data)        # byte i integer verisine ceviriiyo
+    return data
+
+def byte_to_int(data):              # integere cevirmek için gerekli işlemleri yapıyor
+    try:
+        str_rn = data.decode()
+        str = str_rn.rstrip()
+        # if str[0,1] == "Kp":        #deneme için ---------------------------------
+        #print(str)
+        i = int(str)
+        return (i)
+    except:
+        pass
+
+def sendToArduino(Kp ,Ki ,Kd ,Rpm ):
+    massage = Kp + "," + Ki + "," + Kd + "," + Rpm
+    try:
+        arduino.write(massage.encode())
+        print("gönderildi", massage)
+    except:
+        print("gönderilmedi",massage)
+
+def dataSendLoop(addData_callbackFunc):
+    # Setup the signal-slot mechanism.
+    mySrc = Communicate()
+    mySrc.data_signal.connect(addData_callbackFunc)
+
+    # Simulate some data
+    while (True):
+        #time.sleep(0.0001)
+        x = arduino_read()
+        if x != None:                   ## gelen data bos değilse yazsın amacı plot  edilcek değerin olması
+            mySrc.data_signal.emit(x)
+
+            print(x)                           # arduinodan gelen verileri yazıyo
+
+
+    ###
+
+
+###
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    QApplication.setStyle(QStyleFactory.create('Plastique'))
+    myGUI = CustomMainWindow()
+    sys.exit(app.exec_())
